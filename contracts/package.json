@@ -1,0 +1,29 @@
+{
+  "name": "contracts",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "clean": "rm -rf artifacts cache typechain-types",
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "lint": "hardhat compile",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network sepolia"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "description": "Confidential RWA compliance vault contracts powered by FHEVM",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^4.0.2",
+    "@nomicfoundation/hardhat-toolbox-mocha-ethers": "^3.0.3",
+    "dotenv": "^17.4.1",
+    "hardhat": "^3.3.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.2"
+  },
+  "dependencies": {
+    "@fhevm/solidity": "^0.11.1",
+    "@openzeppelin/contracts": "^5.6.1"
+  }
+}

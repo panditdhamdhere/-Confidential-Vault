@@ -1,0 +1,15 @@
+{
+  "name": "zama-season2-confidential-rwa-vault",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "contracts",
+    "apps/web"
+  ],
+  "scripts": {
+    "install:all": "npm install --workspace contracts && npm install --workspace apps/web",
+    "build:web": "npm run build --workspace apps/web",
+    "compile:contracts": "npm run compile --workspace contracts",
+    "test:contracts": "npm run test --workspace contracts"
+  }
+}

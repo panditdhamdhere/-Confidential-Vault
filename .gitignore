@@ -1,0 +1,15 @@
+node_modules
+dist
+coverage
+.DS_Store
+
+contracts/node_modules
+contracts/artifacts
+contracts/cache
+contracts/typechain-types
+
+apps/web/node_modules
+apps/web/dist
+
+*.log
+contracts/.env
