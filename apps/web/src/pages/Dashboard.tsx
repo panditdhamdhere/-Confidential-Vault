@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import "../App.css";
 import { getBrowserProvider, getReadContract, getVaultAddress, getWriteContract } from "../lib/contract";
 
@@ -76,123 +77,139 @@ function Dashboard() {
   };
 
   return (
-    <main className="container">
-      <div className="bg-orb bg-orb-one" />
-      <div className="bg-orb bg-orb-two" />
+    <div className="dashboard-page">
+      <div className="dashboard-bg-gradient" aria-hidden />
+      <div className="dashboard-grid-bg" aria-hidden />
 
-      <nav className="top-nav card-animate">
-        <div className="brand-wrap">
-          <div className="brand-mark">
-            <span className="brand-dot" />
-          </div>
-          <div>
-            <p className="brand-title">Confidential Vault Console</p>
-            <p className="brand-subtitle">Institution-grade onchain compliance workspace</p>
-          </div>
+      <header className="dashboard-header">
+        <div className="dashboard-shell dashboard-header-inner">
+          <Link to="/" className="dashboard-logo">
+            <span className="dashboard-logo-mark" aria-hidden />
+            <span className="dashboard-logo-text">
+              <span className="dashboard-logo-name">Confidential Vault</span>
+              <span className="dashboard-logo-tag">Operations console</span>
+            </span>
+          </Link>
+          <nav className="dashboard-header-actions" aria-label="Console">
+            <a
+              className="dashboard-link-ghost"
+              href="https://docs.zama.ai/protocol/solidity-guides/getting-started/overview"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Documentation
+            </a>
+            <div className="nav-actions">
+              <span className="pill">Sepolia</span>
+              <span className={`pill ${wallet ? "pill-success" : ""}`}>{wallet ? "Connected" : "Disconnected"}</span>
+            </div>
+          </nav>
         </div>
-        <div className="nav-actions">
-          <span className="pill">Sepolia</span>
-          <span className={`pill ${wallet ? "pill-success" : ""}`}>{wallet ? "Connected" : "Disconnected"}</span>
-        </div>
-      </nav>
-
-      <header className="hero card-animate delay-1">
-        <div className="hero-top">
-          <p className="badge">Season 2 Builder Submission</p>
-          <p className="status-chip">{status}</p>
-        </div>
-        <h1 className="hero-title">Confidential RWA Compliance Vault</h1>
-        <p>
-          Institutional-style vault logic with encrypted balances, policy-gated participation, and FHEVM-native
-          confidentiality primitives.
-        </p>
       </header>
 
-      <section className="kpi-grid card-animate delay-2">
-        <article className="kpi card-animate">
-          <p className="kpi-label">Vault Address</p>
-          <code>{contractAddress || "VITE_VAULT_ADDRESS not set"}</code>
-        </article>
-        <article className="kpi card-animate delay-1">
-          <p className="kpi-label">Wallet</p>
-          <p className="kpi-value">{wallet || "Not connected"}</p>
-        </article>
-        <article className="kpi card-animate delay-2">
-          <p className="kpi-label">Status</p>
-          <p className="kpi-value">{status}</p>
-        </article>
-      </section>
-
-      <section className="workspace">
-        <article className="card card-animate delay-3">
-          <h2>What this dApp demonstrates</h2>
-          <ul className="check-list">
-            <li>Encrypted investor balances using `euint64` values.</li>
-            <li>KYC tier and risk-policy checks before confidential actions.</li>
-            <li>Role-aware encrypted state permissions for investor and compliance officer.</li>
-            <li>Production deployment path for Sepolia and Ethereum-ready architecture.</li>
-          </ul>
-
-          <div className="divider" />
-          <h3 className="subhead">Wallet and Network</h3>
-          <p className="hint">Set `VITE_VAULT_ADDRESS` in `apps/web/.env` to your deployed Sepolia vault.</p>
-          <button className="btn btn-primary" onClick={connectWallet}>
-            Connect Wallet
-          </button>
-        </article>
-
-        <div className="stack">
-          <article className="card card-animate delay-3">
-            <h2>Compliance Actions</h2>
-            <div className="field-grid">
-              <div>
-                <label>Minimum KYC tier</label>
-                <input value={policyMinTier} onChange={(e) => setPolicyMinTier(e.target.value)} />
-              </div>
-              <div>
-                <label>Maximum risk class</label>
-                <input value={policyMaxRisk} onChange={(e) => setPolicyMaxRisk(e.target.value)} />
-              </div>
+      <main className="dashboard-main">
+        <div className="dashboard-shell">
+          <header className="hero card-animate">
+            <div className="hero-top">
+              <p className="dashboard-page-label">Live operations</p>
+              <p className="status-chip">{status}</p>
             </div>
-            <button className="btn btn-primary" onClick={updatePolicy}>
-              Update Policy
-            </button>
-
-            <div className="divider" />
-
-            <label>Investor address</label>
-            <input value={investorAddress} onChange={(e) => setInvestorAddress(e.target.value)} />
-            <div className="field-grid">
-              <div>
-                <label>Investor KYC tier</label>
-                <input value={investorTier} onChange={(e) => setInvestorTier(e.target.value)} />
-              </div>
-              <div>
-                <label>Investor risk class</label>
-                <input value={investorRisk} onChange={(e) => setInvestorRisk(e.target.value)} />
-              </div>
-            </div>
-            <button className="btn btn-primary" onClick={registerInvestor}>
-              Register Investor
-            </button>
-          </article>
-
-          <article className="card card-animate delay-3">
-            <h2>Investor Metadata Lookup</h2>
-            <label>Address</label>
-            <input value={lookupAddress} onChange={(e) => setLookupAddress(e.target.value)} />
-            <button className="btn btn-secondary" onClick={fetchMetadata}>
-              Fetch Metadata
-            </button>
-            {metadata && <pre>{JSON.stringify(metadata, null, 2)}</pre>}
-            <p className="hint">
-              FHE deposit/withdraw calls require encrypted input handles and proofs from the FHE client SDK; this app
-              is wired for admin and read flows now.
+            <h1 className="dashboard-hero-title">
+              Confidential RWA vault — <span className="dashboard-title-accent">operational console</span>
+            </h1>
+            <p className="dashboard-hero-lede">
+              Encrypted balances, compliance gates, and role-aware permissions. Configure policy, onboard investors, and
+              extend with FHE client flows when you wire proofs.
             </p>
-          </article>
+          </header>
+
+          <section className="kpi-grid card-animate delay-1">
+            <article className="kpi">
+              <p className="kpi-label">Vault contract</p>
+              <code>{contractAddress || "VITE_VAULT_ADDRESS not set"}</code>
+            </article>
+            <article className="kpi">
+              <p className="kpi-label">Wallet</p>
+              <p className="kpi-value">{wallet || "Not connected"}</p>
+            </article>
+            <article className="kpi">
+              <p className="kpi-label">Last activity</p>
+              <p className="kpi-value">{status}</p>
+            </article>
+          </section>
+
+          <section className="workspace">
+            <article className="card card-animate delay-2">
+              <h2>Overview &amp; wallet</h2>
+              <ul className="check-list">
+                <li>Encrypted investor balances using `euint64` values.</li>
+                <li>KYC tier and risk-policy checks before confidential actions.</li>
+                <li>Role-aware encrypted state for investor and compliance officer.</li>
+                <li>Deploy on Sepolia; point `VITE_VAULT_ADDRESS` at your vault.</li>
+              </ul>
+
+              <div className="divider" />
+              <h3 className="subhead">Connect wallet</h3>
+              <p className="hint">Use a funded Sepolia account to submit transactions.</p>
+              <button type="button" className="btn btn-primary" onClick={connectWallet}>
+                Connect wallet
+              </button>
+            </article>
+
+            <div className="stack">
+              <article className="card card-animate delay-2">
+                <h2>Compliance actions</h2>
+                <div className="field-grid">
+                  <div>
+                    <label htmlFor="min-kyc">Minimum KYC tier</label>
+                    <input id="min-kyc" value={policyMinTier} onChange={(e) => setPolicyMinTier(e.target.value)} />
+                  </div>
+                  <div>
+                    <label htmlFor="max-risk">Maximum risk class</label>
+                    <input id="max-risk" value={policyMaxRisk} onChange={(e) => setPolicyMaxRisk(e.target.value)} />
+                  </div>
+                </div>
+                <button type="button" className="btn btn-primary" onClick={updatePolicy}>
+                  Update policy
+                </button>
+
+                <div className="divider" />
+
+                <label htmlFor="inv-addr">Investor address</label>
+                <input id="inv-addr" value={investorAddress} onChange={(e) => setInvestorAddress(e.target.value)} />
+                <div className="field-grid">
+                  <div>
+                    <label htmlFor="inv-tier">Investor KYC tier</label>
+                    <input id="inv-tier" value={investorTier} onChange={(e) => setInvestorTier(e.target.value)} />
+                  </div>
+                  <div>
+                    <label htmlFor="inv-risk">Investor risk class</label>
+                    <input id="inv-risk" value={investorRisk} onChange={(e) => setInvestorRisk(e.target.value)} />
+                  </div>
+                </div>
+                <button type="button" className="btn btn-primary" onClick={registerInvestor}>
+                  Register investor
+                </button>
+              </article>
+
+              <article className="card card-animate delay-3">
+                <h2>Investor metadata</h2>
+                <label htmlFor="lookup-addr">Address</label>
+                <input id="lookup-addr" value={lookupAddress} onChange={(e) => setLookupAddress(e.target.value)} />
+                <button type="button" className="btn btn-secondary" onClick={fetchMetadata}>
+                  Fetch metadata
+                </button>
+                {metadata && <pre>{JSON.stringify(metadata, null, 2)}</pre>}
+                <p className="hint">
+                  Deposit and withdraw require encrypted inputs and proofs from the FHE client SDK; this panel covers
+                  admin and read paths.
+                </p>
+              </article>
+            </div>
+          </section>
         </div>
-      </section>
-    </main>
+      </main>
+    </div>
   );
 }
 
