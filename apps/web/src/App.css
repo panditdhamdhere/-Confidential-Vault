@@ -132,6 +132,24 @@
   background: rgba(148, 163, 184, 0.08);
 }
 
+/* RainbowKit ConnectButton — compact in header */
+.dashboard-rk-connect {
+  display: flex;
+  align-items: center;
+}
+
+.dashboard-rk-connect [data-rk] button,
+.dashboard-rk-inline [data-rk] button {
+  font-size: 0.8125rem !important;
+  height: 2.25rem !important;
+  min-height: 2.25rem !important;
+  border-radius: 10px !important;
+}
+
+.dashboard-rk-inline {
+  margin-top: 0.5rem;
+}
+
 .dashboard-main {
   position: relative;
   z-index: 1;
@@ -489,6 +507,7 @@ pre {
   .btn:hover {
     transform: none;
   }
+
 }
 
 @media (max-width: 800px) {
@@ -512,5 +531,10 @@ pre {
 
   .dashboard-header-inner {
     flex-wrap: wrap;
+  }
+
+  .dashboard-header-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }

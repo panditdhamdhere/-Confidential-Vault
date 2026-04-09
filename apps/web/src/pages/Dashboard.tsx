@@ -1,7 +1,14 @@
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import "../App.css";
-import { getBrowserProvider, getReadContract, getVaultAddress, getWriteContract } from "../lib/contract";
+import {
+  createVaultReadContract,
+  createVaultWriteContract,
+  getVaultAddress,
+} from "../lib/contract";
+import { publicClientToProvider, walletClientToSigner } from "../lib/ethersAdapter";
 
 type InvestorMetadata = {
   isRegistered: boolean;
@@ -10,7 +17,10 @@ type InvestorMetadata = {
 };
 
 function Dashboard() {
-  const [wallet, setWallet] = useState<string>("");
+  const { address, isConnected } = useAccount();
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
+
   const [status, setStatus] = useState<string>("Idle");
   const [policyMinTier, setPolicyMinTier] = useState<string>("1");
   const [policyMaxRisk, setPolicyMaxRisk] = useState<string>("5");
@@ -22,23 +32,18 @@ function Dashboard() {
 
   const contractAddress = useMemo(() => getVaultAddress(), []);
 
-  const connectWallet = async () => {
-    try {
-      setStatus("Connecting wallet...");
-      const provider = await getBrowserProvider();
-      await provider.send("eth_requestAccounts", []);
-      const signer = await provider.getSigner();
-      setWallet(await signer.getAddress());
-      setStatus("Wallet connected.");
-    } catch (error) {
-      setStatus((error as Error).message);
-    }
-  };
+  const shortAddress = (addr: string) =>
+    addr.length > 10 ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr;
 
   const updatePolicy = async () => {
     try {
+      if (!walletClient) {
+        setStatus("Connect a wallet first (use the button in the header).");
+        return;
+      }
       setStatus("Submitting updatePolicy transaction...");
-      const contract = await getWriteContract();
+      const signer = await walletClientToSigner(walletClient);
+      const contract = createVaultWriteContract(signer);
       const tx = await contract.updatePolicy(Number(policyMinTier), Number(policyMaxRisk));
       await tx.wait();
       setStatus(`Policy updated. Tx: ${tx.hash}`);
@@ -49,8 +54,13 @@ function Dashboard() {
 
   const registerInvestor = async () => {
     try {
+      if (!walletClient) {
+        setStatus("Connect a wallet first (use the button in the header).");
+        return;
+      }
       setStatus("Submitting registerInvestor transaction...");
-      const contract = await getWriteContract();
+      const signer = await walletClientToSigner(walletClient);
+      const contract = createVaultWriteContract(signer);
       const tx = await contract.registerInvestor(investorAddress, Number(investorTier), Number(investorRisk));
       await tx.wait();
       setStatus(`Investor registered. Tx: ${tx.hash}`);
@@ -61,8 +71,13 @@ function Dashboard() {
 
   const fetchMetadata = async () => {
     try {
+      if (!publicClient) {
+        setStatus("Network client not ready.");
+        return;
+      }
       setStatus("Reading investor metadata...");
-      const contract = await getReadContract();
+      const provider = publicClientToProvider(publicClient);
+      const contract = createVaultReadContract(provider);
       const result = await contract.getInvestorMetadata(lookupAddress);
       setMetadata({
         isRegistered: result[0],
@@ -99,9 +114,14 @@ function Dashboard() {
             >
               Documentation
             </a>
+            <div className="dashboard-rk-connect">
+              <ConnectButton chainStatus="icon" showBalance={false} />
+            </div>
             <div className="nav-actions">
               <span className="pill">Sepolia</span>
-              <span className={`pill ${wallet ? "pill-success" : ""}`}>{wallet ? "Connected" : "Disconnected"}</span>
+              <span className={`pill ${isConnected ? "pill-success" : ""}`}>
+                {isConnected ? "Connected" : "Disconnected"}
+              </span>
             </div>
           </nav>
         </div>
@@ -130,7 +150,9 @@ function Dashboard() {
             </article>
             <article className="kpi">
               <p className="kpi-label">Wallet</p>
-              <p className="kpi-value">{wallet || "Not connected"}</p>
+              <p className="kpi-value">
+                {address ? shortAddress(address) : "Not connected"}
+              </p>
             </article>
             <article className="kpi">
               <p className="kpi-label">Last activity</p>
@@ -149,11 +171,13 @@ function Dashboard() {
               </ul>
 
               <div className="divider" />
-              <h3 className="subhead">Connect wallet</h3>
-              <p className="hint">Use a funded Sepolia account to submit transactions.</p>
-              <button type="button" className="btn btn-primary" onClick={connectWallet}>
-                Connect wallet
-              </button>
+              <h3 className="subhead">Wallet connection</h3>
+              <p className="hint">
+                RainbowKit supports browser wallets and WalletConnect. Use the control in the header, or connect here:
+              </p>
+              <div className="dashboard-rk-inline">
+                <ConnectButton showBalance={false} />
+              </div>
             </article>
 
             <div className="stack">
