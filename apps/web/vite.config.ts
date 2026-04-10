@@ -5,9 +5,13 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 const appDir = path.dirname(fileURLToPath(import.meta.url));
-const workspaceRoot = path.resolve(appDir, "../..");
+/** Only treat `../../` as the monorepo root when this package lives at `apps/web`. */
+const workspaceRoot =
+  path.basename(appDir) === "web" && path.basename(path.dirname(appDir)) === "apps"
+    ? path.resolve(appDir, "../..")
+    : appDir;
 
-/** When npm hoists react to the monorepo root, point Vite there; on Vercel (root = apps/web) use local node_modules. */
+/** When npm hoists react to the monorepo root, point Vite there; otherwise use local `node_modules`. */
 function hoistedReactAliases(): Record<string, string> | undefined {
   const rootReact = path.join(workspaceRoot, "node_modules/react");
   if (fs.existsSync(rootReact)) {
