@@ -1,7 +1,8 @@
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useMemo, useState } from "react";
+import { isAddress } from "ethers";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAccount, usePublicClient, useWalletClient } from "wagmi";
+import { useAccount, useChainId, usePublicClient, useWalletClient } from "wagmi";
 import "../App.css";
 import {
   createVaultReadContract,
@@ -11,6 +12,7 @@ import {
 import { publicClientToProvider, walletClientToSigner } from "../lib/ethersAdapter";
 
 const SEPOLIA_EXP = "https://sepolia.etherscan.io";
+const SEPOLIA_CHAIN_ID = 11155111;
 
 type InvestorMetadata = {
   isRegistered: boolean;
@@ -18,12 +20,17 @@ type InvestorMetadata = {
   riskClass: number;
 };
 
+type ToastState = {
+  kind: "success" | "error";
+  message: string;
+};
+
 function Dashboard() {
-  const { address, isConnected } = useAccount();
+  const { isConnected } = useAccount();
+  const chainId = useChainId();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
 
-  const [activityLabel, setActivityLabel] = useState<string>("Ready");
   const [lastTxHash, setLastTxHash] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [policyMinTier, setPolicyMinTier] = useState<string>("1");
@@ -33,11 +40,13 @@ function Dashboard() {
   const [investorRisk, setInvestorRisk] = useState<string>("3");
   const [lookupAddress, setLookupAddress] = useState<string>("");
   const [metadata, setMetadata] = useState<InvestorMetadata | null>(null);
+  const [isBusy, setIsBusy] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
 
   const contractAddress = useMemo(() => getVaultAddress(), []);
-
-  const shortAddress = (addr: string) =>
-    addr.length > 10 ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr;
+  const hasValidVaultAddress = useMemo(() => isAddress(contractAddress), [contractAddress]);
+  const isWrongNetwork = isConnected && chainId !== SEPOLIA_CHAIN_ID;
 
   const shortHash = (h: string) => (h.length > 18 ? `${h.slice(0, 10)}…${h.slice(-6)}` : h);
 
@@ -46,71 +55,120 @@ function Dashboard() {
       await navigator.clipboard.writeText(text);
       setCopied(key);
       window.setTimeout(() => setCopied(null), 2000);
-    } catch {
-      setActivityLabel("Could not copy to clipboard.");
+    } catch (error) {
+      console.error("Clipboard copy failed:", error);
     }
   };
 
   const vaultExplorerUrl =
-    contractAddress && contractAddress.startsWith("0x") && contractAddress.length > 20
-      ? `${SEPOLIA_EXP}/address/${contractAddress}`
-      : null;
+    hasValidVaultAddress ? `${SEPOLIA_EXP}/address/${contractAddress}` : null;
+
+  const toErrorMessage = (error: unknown) => {
+    if (error instanceof Error && error.message) return error.message;
+    return "Something went wrong. Please try again.";
+  };
+
+  const notify = (message: string, kind: ToastState["kind"]) => {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+    }
+    setToast({ message, kind });
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast(null);
+      toastTimerRef.current = null;
+    }, 3200);
+  };
+
+  const toUint8 = (value: string, fieldLabel: string) => {
+    const n = Number(value);
+    if (!Number.isInteger(n) || n < 0 || n > 255) {
+      throw new Error(`${fieldLabel} must be an integer between 0 and 255.`);
+    }
+    return n;
+  };
+
+  const ensureWriteReady = () => {
+    if (!walletClient) throw new Error("Connect a wallet first.");
+    if (!hasValidVaultAddress) throw new Error("Set a valid VITE_VAULT_ADDRESS.");
+    if (isWrongNetwork) throw new Error("Switch your wallet network to Sepolia.");
+  };
 
   const updatePolicy = async () => {
+    if (isBusy) return;
     try {
-      if (!walletClient) {
-        setActivityLabel("Connect a wallet (header).");
-        return;
-      }
-      setActivityLabel("Submitting transaction…");
-      const signer = await walletClientToSigner(walletClient);
+      ensureWriteReady();
+      const currentWallet = walletClient;
+      if (!currentWallet) throw new Error("Connect a wallet first.");
+      const minTier = toUint8(policyMinTier, "Minimum KYC tier");
+      const maxRisk = toUint8(policyMaxRisk, "Maximum risk class");
+      if (minTier > maxRisk) throw new Error("Minimum KYC tier cannot be greater than maximum risk class.");
+      setIsBusy(true);
+      const signer = await walletClientToSigner(currentWallet);
       const contract = createVaultWriteContract(signer);
-      const tx = await contract.updatePolicy(Number(policyMinTier), Number(policyMaxRisk));
+      const tx = await contract.updatePolicy(minTier, maxRisk);
       await tx.wait();
-      setActivityLabel("Policy updated on-chain.");
       setLastTxHash(tx.hash);
-    } catch (error) {
-      setActivityLabel((error as Error).message);
+      notify("Policy updated successfully.", "success");
+    } catch (error: unknown) {
+      const msg = toErrorMessage(error);
+      console.error(msg);
+      notify(msg, "error");
+    } finally {
+      setIsBusy(false);
     }
   };
 
   const registerInvestor = async () => {
+    if (isBusy) return;
     try {
-      if (!walletClient) {
-        setActivityLabel("Connect a wallet (header).");
-        return;
-      }
-      setActivityLabel("Submitting transaction…");
-      const signer = await walletClientToSigner(walletClient);
+      ensureWriteReady();
+      const currentWallet = walletClient;
+      if (!currentWallet) throw new Error("Connect a wallet first.");
+      if (!isAddress(investorAddress.trim())) throw new Error("Enter a valid investor address.");
+      const kycTier = toUint8(investorTier, "Investor KYC tier");
+      const riskClass = toUint8(investorRisk, "Investor risk class");
+      setIsBusy(true);
+      const signer = await walletClientToSigner(currentWallet);
       const contract = createVaultWriteContract(signer);
-      const tx = await contract.registerInvestor(investorAddress, Number(investorTier), Number(investorRisk));
+      const tx = await contract.registerInvestor(investorAddress.trim(), kycTier, riskClass);
       await tx.wait();
-      setActivityLabel("Investor registered on-chain.");
       setLastTxHash(tx.hash);
-    } catch (error) {
-      setActivityLabel((error as Error).message);
+      notify("Investor registered successfully.", "success");
+    } catch (error: unknown) {
+      const msg = toErrorMessage(error);
+      console.error(msg);
+      notify(msg, "error");
+    } finally {
+      setIsBusy(false);
     }
   };
 
   const fetchMetadata = async () => {
+    if (isBusy) return;
     try {
       if (!publicClient) {
-        setActivityLabel("Network client not ready.");
+        console.error("Network client not ready.");
         return;
       }
-      setActivityLabel("Reading on-chain metadata…");
+      if (!hasValidVaultAddress) throw new Error("Set a valid VITE_VAULT_ADDRESS.");
+      if (!isAddress(lookupAddress.trim())) throw new Error("Enter a valid address to fetch metadata.");
+      setIsBusy(true);
       const provider = publicClientToProvider(publicClient);
       const contract = createVaultReadContract(provider);
-      const result = await contract.getInvestorMetadata(lookupAddress);
+      const result = await contract.getInvestorMetadata(lookupAddress.trim());
       setMetadata({
         isRegistered: result[0],
         kycTier: Number(result[1]),
         riskClass: Number(result[2]),
       });
-      setActivityLabel("Metadata loaded (public fields).");
-    } catch (error) {
+      notify("Investor metadata fetched.", "success");
+    } catch (error: unknown) {
       setMetadata(null);
-      setActivityLabel((error as Error).message);
+      const msg = toErrorMessage(error);
+      console.error(msg);
+      notify(msg, "error");
+    } finally {
+      setIsBusy(false);
     }
   };
 
@@ -152,12 +210,24 @@ function Dashboard() {
 
       <main className="dashboard-main">
         <div className="dashboard-shell">
+          {toast && (
+            <div
+              className={`dashboard-toast ${toast.kind === "success" ? "dashboard-toast-success" : "dashboard-toast-error"}`}
+              role="status"
+              aria-live="polite"
+            >
+              {toast.message}
+            </div>
+          )}
           <header className="hero card-animate">
             <div className="hero-top">
               <p className="dashboard-page-label">Live operations</p>
             </div>
             <div className="dashboard-activity-block">
-              <p className="status-chip status-chip-static">{activityLabel}</p>
+              {!hasValidVaultAddress && (
+                <p className="hint">Set a valid <code className="inline-code">VITE_VAULT_ADDRESS</code> to enable writes.</p>
+              )}
+              {isWrongNetwork && <p className="hint">Switch wallet network to Sepolia for contract operations.</p>}
               {lastTxHash && (
                 <div className="tx-pill">
                   <code title={lastTxHash}>{shortHash(lastTxHash)}</code>
@@ -178,60 +248,17 @@ function Dashboard() {
             <h1 className="dashboard-hero-title">
               Confidential RWA vault — <span className="dashboard-title-accent">operational console</span>
             </h1>
-            <ul className="dashboard-hero-badges" aria-label="Product signals">
-              <li>FHEVM</li>
-              <li>Encrypted balances</li>
-              <li>Compliance gates</li>
-              <li>Sepolia-ready</li>
-            </ul>
             <p className="dashboard-hero-lede">
-              Encrypted balances, compliance gates, and role-aware permissions. Judges can follow the demo path below,
-              then verify any successful write on Etherscan from the transaction strip.
+              Manage encrypted balances with compliance-aware controls and role-based permissions. Track every successful
+              write directly from the transaction strip and open it on Etherscan for audit visibility.
             </p>
           </header>
 
-          <section className="demo-rail card-animate delay-1" aria-label="Suggested demo order">
-            <div className="demo-rail-head">
-              <span className="demo-rail-kicker">Submission demo</span>
-              <h2 className="demo-rail-title">90-second storyboard</h2>
-            </div>
-            <ol className="demo-rail-steps">
-              <li>
-                <span className="demo-rail-num">1</span>
-                <div>
-                  <strong>Connect</strong>
-                  <span>Pick Sepolia in RainbowKit; fund with test ETH.</span>
-                </div>
-              </li>
-              <li>
-                <span className="demo-rail-num">2</span>
-                <div>
-                  <strong>Policy</strong>
-                  <span>Update min KYC / max risk — watch Etherscan link appear.</span>
-                </div>
-              </li>
-              <li>
-                <span className="demo-rail-num">3</span>
-                <div>
-                  <strong>Onboard</strong>
-                  <span>Register an investor wallet you control.</span>
-                </div>
-              </li>
-              <li>
-                <span className="demo-rail-num">4</span>
-                <div>
-                  <strong>Prove read path</strong>
-                  <span>Fetch public metadata; mention FHE client for deposits next.</span>
-                </div>
-              </li>
-            </ol>
-          </section>
-
           <section className="kpi-grid card-animate delay-1">
-            <article className="kpi">
+            <article className="kpi kpi-vault">
               <p className="kpi-label">Vault contract</p>
-              <code>{contractAddress || "Set VITE_VAULT_ADDRESS in .env"}</code>
-              {!!contractAddress && contractAddress.startsWith("0x") && (
+              <code className="kpi-contract-address">{contractAddress || "Set VITE_VAULT_ADDRESS in .env"}</code>
+              {hasValidVaultAddress && (
                 <div className="kpi-actions">
                   <button type="button" className="btn-tiny" onClick={() => copyText(contractAddress, "vault")}>
                     {copied === "vault" ? "Copied" : "Copy address"}
@@ -244,38 +271,13 @@ function Dashboard() {
                 </div>
               )}
             </article>
-            <article className="kpi">
-              <p className="kpi-label">Active wallet</p>
-              <p className="kpi-value">{address ? shortAddress(address) : "Not connected"}</p>
-            </article>
-            <article className="kpi">
-              <p className="kpi-label">Console state</p>
-              <p className="kpi-value kpi-value-muted">{activityLabel}</p>
-            </article>
           </section>
 
           <section className="workspace">
-            <article className="card card-animate delay-2">
-              <h2>What this proves</h2>
-              <ul className="check-list">
-                <li>Institutional narrative: RWA + compliance without exposing sensitive balances on a public ledger.</li>
-                <li>
-                  Technical depth: FHE types, policy checks, and <code className="inline-code">FHE.allow</code> patterns
-                  in the contract.
-                </li>
-                <li>Ship-quality UI: wallet UX, explorer links, and a repeatable judge flow.</li>
-              </ul>
-
-              <div className="divider" />
-              <h3 className="subhead">Wallet</h3>
-              <p className="hint">
-                Use the RainbowKit control in the header (WalletConnect works when{" "}
-                <code className="inline-code">VITE_WALLETCONNECT_PROJECT_ID</code> is set).
-              </p>
-            </article>
-
-            <div className="stack">
-              <article className="card card-featured card-animate delay-2">
+            <article className="card card-animate delay-2 workspace-card">
+              <div className="workspace-card-grid">
+                <div className="workspace-card-stack">
+                  <article className="card card-featured workspace-nested-card">
                 <h2>Compliance actions</h2>
                 <p className="card-lede">On-chain writes for your video proof — each success surfaces an Etherscan link above.</p>
                 <div className="field-grid">
@@ -288,8 +290,8 @@ function Dashboard() {
                     <input id="max-risk" value={policyMaxRisk} onChange={(e) => setPolicyMaxRisk(e.target.value)} />
                   </div>
                 </div>
-                <button type="button" className="btn btn-primary" onClick={updatePolicy}>
-                  Update policy
+                <button type="button" className="btn btn-primary" onClick={updatePolicy} disabled={isBusy}>
+                  {isBusy ? "Processing..." : "Update policy"}
                 </button>
 
                 <div className="divider" />
@@ -306,17 +308,17 @@ function Dashboard() {
                     <input id="inv-risk" value={investorRisk} onChange={(e) => setInvestorRisk(e.target.value)} />
                   </div>
                 </div>
-                <button type="button" className="btn btn-primary" onClick={registerInvestor}>
-                  Register investor
+                <button type="button" className="btn btn-primary" onClick={registerInvestor} disabled={isBusy}>
+                  {isBusy ? "Processing..." : "Register investor"}
                 </button>
-              </article>
+                  </article>
 
-              <article className="card card-animate delay-3">
+                  <article className="card workspace-nested-card">
                 <h2>Investor metadata</h2>
                 <label htmlFor="lookup-addr">Address</label>
                 <input id="lookup-addr" value={lookupAddress} onChange={(e) => setLookupAddress(e.target.value)} />
-                <button type="button" className="btn btn-secondary" onClick={fetchMetadata}>
-                  Fetch metadata
+                <button type="button" className="btn btn-secondary" onClick={fetchMetadata} disabled={isBusy}>
+                  {isBusy ? "Processing..." : "Fetch metadata"}
                 </button>
                 {metadata && (
                   <dl className="metadata-dl">
@@ -338,8 +340,10 @@ function Dashboard() {
                   Confidential deposits still need client-side encryption + proofs; call that out in your pitch as the next
                   layer on this foundation.
                 </p>
-              </article>
-            </div>
+                  </article>
+                </div>
+              </div>
+            </article>
           </section>
         </div>
       </main>

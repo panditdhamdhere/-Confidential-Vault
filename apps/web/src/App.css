@@ -156,6 +156,28 @@
   padding: clamp(1.75rem, 5vw, 2.75rem) 0 clamp(3rem, 8vw, 5rem);
 }
 
+.dashboard-toast {
+  margin: 0 0 1rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: 1px solid var(--lp-border);
+  background: rgba(15, 23, 42, 0.82);
+}
+
+.dashboard-toast-success {
+  border-color: rgba(52, 211, 153, 0.45);
+  color: #a7f3d0;
+  background: rgba(6, 78, 59, 0.28);
+}
+
+.dashboard-toast-error {
+  border-color: rgba(248, 113, 113, 0.45);
+  color: #fecaca;
+  background: rgba(127, 29, 29, 0.28);
+}
+
 /* Hero */
 .hero {
   margin-bottom: clamp(1.5rem, 4vw, 2rem);
@@ -422,7 +444,7 @@
 
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   margin-bottom: 20px;
 }
@@ -468,15 +490,41 @@
   margin-top: 0.5rem;
 }
 
+.kpi-vault {
+  max-width: 760px;
+}
+
+.kpi-contract-address {
+  font-size: 0.94rem;
+  line-height: 1.4;
+  word-break: break-all;
+}
+
 .workspace {
+  display: block;
+}
+
+.workspace-card {
+  padding: 18px;
+}
+
+.workspace-card-grid {
+  display: block;
+}
+
+.workspace-card-stack {
   display: grid;
-  grid-template-columns: minmax(280px, 0.95fr) minmax(420px, 1.25fr);
   gap: 16px;
 }
 
-.stack {
-  display: grid;
-  gap: 16px;
+.workspace-nested-card {
+  background: rgba(2, 6, 23, 0.32);
+  box-shadow: none;
+}
+
+.workspace-nested-card:hover {
+  transform: none;
+  box-shadow: none;
 }
 
 .field-grid {
@@ -781,7 +829,7 @@ pre {
     grid-template-columns: 1fr;
   }
 
-  .workspace {
+  .workspace-card-grid {
     grid-template-columns: 1fr;
   }
 

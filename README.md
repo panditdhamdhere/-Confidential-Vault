@@ -1,88 +1,131 @@
-# Confidential RWA Compliance Vault (Zama Season 2)
+# Confidential RWA Compliance Vault
 
-Production-oriented starter for a Builder Track submission:
+Confidential on-chain operations console and Solidity vault built for Zama FHEVM.
 
-- FHEVM smart contract with encrypted balances and compliance-gated participation
-- React frontend for demo, submission messaging, and deployment handoff
-- Sepolia deployment script and environment setup
+This repo contains:
 
-## Project Structure
+- an FHE-enabled compliance vault contract (`contracts/`)
+- a production-ready React operations console (`apps/web/`)
+- deployment + verification scripts for Sepolia
 
-- `contracts`: Hardhat + Solidity contracts
-- `apps/web`: Vite + React frontend
+## Architecture
 
-## Smart Contract Highlights
+### Contracts (`contracts/`)
 
-`ConfidentialComplianceVault` includes:
+Core contract: `ConfidentialComplianceVault`
 
-- encrypted balance storage using `euint64`
-- investor registration and compliance policy checks
-- confidential deposit and withdrawal request flow
-- handle permissions for investor and compliance officer via `FHE.allow`
+- uses `euint64` balances with `@fhevm/solidity`
+- supports compliance policy updates (`minKycTier`, `maxRiskClass`)
+- supports investor onboarding and metadata reads
+- supports confidential `deposit` and `requestWithdrawal` flows
+- grants encrypted handle access using `FHE.allow` / `FHE.allowThis`
 
-## Prerequisites
+### Web console (`apps/web/`)
+
+- Vite + React + TypeScript
+- RainbowKit + wagmi wallet integration
+- Sepolia-focused write actions:
+  - update policy
+  - register investor
+- public metadata read flow (`getInvestorMetadata`)
+- production safeguards:
+  - env validation for `VITE_VAULT_ADDRESS`
+  - address and input validation
+  - Sepolia chain checks before writes
+
+## Project layout
+
+- `contracts/` - Hardhat v3 workspace
+- `apps/web/` - frontend workspace
+- `package.json` - npm workspaces root
+
+## Requirements
 
 - Node.js 20+
 - npm 10+
-- Sepolia RPC endpoint
-- funded deployer wallet (test ETH)
+- Sepolia RPC URL
+- funded Sepolia deployer wallet
 
-## Quickstart
+## Setup
 
-### 1) Install dependencies
-
-```bash
-cd contracts && npm install
-cd ../apps/web && npm install
-```
-
-### 2) Compile contracts
+Install all dependencies from repo root:
 
 ```bash
-cd contracts
-npm run compile
+npm install
 ```
 
-### 3) Configure deployment env
+## Contracts workflow
+
+Create env file:
 
 ```bash
-cd contracts
-cp .env.example .env
+cp contracts/.env.example contracts/.env
 ```
 
-Fill:
+Set:
 
 - `SEPOLIA_RPC_URL`
 - `DEPLOYER_PRIVATE_KEY`
+- `ETHERSCAN_API_KEY` (for verification)
+- `VAULT_CONTRACT_ADDRESS` (for verify script)
 
-### 4) Deploy to Sepolia
-
-```bash
-cd contracts
-npm run deploy:sepolia
-```
-
-### 5) Run frontend
+Compile:
 
 ```bash
-cd apps/web
-cp .env.example .env
-npm run dev
+npm run compile --workspace contracts
 ```
 
-Set `VITE_VAULT_ADDRESS` in `apps/web/.env` using the deployed contract address.
+Deploy:
 
-## Submission Notes
+```bash
+npm run deploy:sepolia --workspace contracts
+```
 
-For final Builder submission, add:
+Verify:
 
-- transaction links and verified contract address
-- 3-minute demo video (problem -> architecture -> live tx flow)
-- docs describing confidentiality model, compliance logic, and failure modes
+```bash
+npm run verify:sepolia --workspace contracts
+```
 
-## Next Production Enhancements
+## Web workflow
 
-- wallet + signer integration (wagmi/viem/ethers)
-- FHE input encryption/proof generation in frontend using official SDK
-- robust role management (multisig owner/compliance)
-- end-to-end integration tests on Sepolia
+Create env file:
+
+```bash
+cp apps/web/.env.example apps/web/.env
+```
+
+Set:
+
+- `VITE_VAULT_ADDRESS` (required)
+- `VITE_WALLETCONNECT_PROJECT_ID` (recommended for WalletConnect/mobile)
+
+Run locally:
+
+```bash
+npm run dev --workspace apps/web
+```
+
+Production build:
+
+```bash
+npm run build --workspace apps/web
+```
+
+## Deployment notes
+
+- Web app expects Sepolia for on-chain writes.
+- Do not commit private env files (`contracts/.env`, `apps/web/.env`).
+- If using Vercel, set root directory to `apps/web` and configure `VITE_*` env vars.
+
+## Current deployed vault
+
+- Network: Sepolia
+- Contract: `0x2d11447C92016dB7965CF4B8964F40873739EA81`
+
+## Security and next steps
+
+- rotate any leaked private keys immediately
+- move privileged roles to multisig for production
+- add end-to-end tests for policy + registration flows
+- integrate frontend encryption/proof generation for full confidential deposit UX

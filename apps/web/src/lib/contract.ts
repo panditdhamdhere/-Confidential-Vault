@@ -1,4 +1,4 @@
-import { Contract, type BrowserProvider, type JsonRpcSigner } from "ethers";
+import { Contract, isAddress, type BrowserProvider, type JsonRpcSigner } from "ethers";
 
 export const VAULT_ABI = [
   "function complianceOfficer() view returns (address)",
@@ -10,21 +10,26 @@ export const VAULT_ABI = [
 ] as const;
 
 export const getVaultAddress = (): string => {
-  return import.meta.env.VITE_VAULT_ADDRESS || "";
+  return (import.meta.env.VITE_VAULT_ADDRESS || "").trim();
 };
 
-export function createVaultReadContract(provider: BrowserProvider): Contract {
+function requireValidVaultAddress(): string {
   const address = getVaultAddress();
   if (!address) {
-    throw new Error("Missing VITE_VAULT_ADDRESS in frontend .env file.");
+    throw new Error("Missing VITE_VAULT_ADDRESS in frontend env.");
   }
+  if (!isAddress(address)) {
+    throw new Error("Invalid VITE_VAULT_ADDRESS. Expected a valid EVM address.");
+  }
+  return address;
+}
+
+export function createVaultReadContract(provider: BrowserProvider): Contract {
+  const address = requireValidVaultAddress();
   return new Contract(address, VAULT_ABI, provider);
 }
 
 export function createVaultWriteContract(signer: JsonRpcSigner): Contract {
-  const address = getVaultAddress();
-  if (!address) {
-    throw new Error("Missing VITE_VAULT_ADDRESS in frontend .env file.");
-  }
+  const address = requireValidVaultAddress();
   return new Contract(address, VAULT_ABI, signer);
 }
