@@ -25,6 +25,8 @@ type ToastState = {
   message: string;
 };
 
+type BusyAction = "updatePolicy" | "registerInvestor" | "fetchMetadata" | null;
+
 function Dashboard() {
   const { isConnected } = useAccount();
   const chainId = useChainId();
@@ -40,7 +42,7 @@ function Dashboard() {
   const [investorRisk, setInvestorRisk] = useState<string>("3");
   const [lookupAddress, setLookupAddress] = useState<string>("");
   const [metadata, setMetadata] = useState<InvestorMetadata | null>(null);
-  const [isBusy, setIsBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState<BusyAction>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<number | null>(null);
 
@@ -94,7 +96,7 @@ function Dashboard() {
   };
 
   const updatePolicy = async () => {
-    if (isBusy) return;
+    if (busyAction) return;
     try {
       ensureWriteReady();
       const currentWallet = walletClient;
@@ -102,7 +104,7 @@ function Dashboard() {
       const minTier = toUint8(policyMinTier, "Minimum KYC tier");
       const maxRisk = toUint8(policyMaxRisk, "Maximum risk class");
       if (minTier > maxRisk) throw new Error("Minimum KYC tier cannot be greater than maximum risk class.");
-      setIsBusy(true);
+      setBusyAction("updatePolicy");
       const signer = await walletClientToSigner(currentWallet);
       const contract = createVaultWriteContract(signer);
       const tx = await contract.updatePolicy(minTier, maxRisk);
@@ -114,12 +116,12 @@ function Dashboard() {
       console.error(msg);
       notify(msg, "error");
     } finally {
-      setIsBusy(false);
+      setBusyAction(null);
     }
   };
 
   const registerInvestor = async () => {
-    if (isBusy) return;
+    if (busyAction) return;
     try {
       ensureWriteReady();
       const currentWallet = walletClient;
@@ -127,7 +129,7 @@ function Dashboard() {
       if (!isAddress(investorAddress.trim())) throw new Error("Enter a valid investor address.");
       const kycTier = toUint8(investorTier, "Investor KYC tier");
       const riskClass = toUint8(investorRisk, "Investor risk class");
-      setIsBusy(true);
+      setBusyAction("registerInvestor");
       const signer = await walletClientToSigner(currentWallet);
       const contract = createVaultWriteContract(signer);
       const tx = await contract.registerInvestor(investorAddress.trim(), kycTier, riskClass);
@@ -139,12 +141,12 @@ function Dashboard() {
       console.error(msg);
       notify(msg, "error");
     } finally {
-      setIsBusy(false);
+      setBusyAction(null);
     }
   };
 
   const fetchMetadata = async () => {
-    if (isBusy) return;
+    if (busyAction) return;
     try {
       if (!publicClient) {
         console.error("Network client not ready.");
@@ -152,7 +154,7 @@ function Dashboard() {
       }
       if (!hasValidVaultAddress) throw new Error("Set a valid VITE_VAULT_ADDRESS.");
       if (!isAddress(lookupAddress.trim())) throw new Error("Enter a valid address to fetch metadata.");
-      setIsBusy(true);
+      setBusyAction("fetchMetadata");
       const provider = publicClientToProvider(publicClient);
       const contract = createVaultReadContract(provider);
       const result = await contract.getInvestorMetadata(lookupAddress.trim());
@@ -168,7 +170,7 @@ function Dashboard() {
       console.error(msg);
       notify(msg, "error");
     } finally {
-      setIsBusy(false);
+      setBusyAction(null);
     }
   };
 
@@ -290,8 +292,8 @@ function Dashboard() {
                     <input id="max-risk" value={policyMaxRisk} onChange={(e) => setPolicyMaxRisk(e.target.value)} />
                   </div>
                 </div>
-                <button type="button" className="btn btn-primary" onClick={updatePolicy} disabled={isBusy}>
-                  {isBusy ? "Processing..." : "Update policy"}
+                <button type="button" className="btn btn-primary" onClick={updatePolicy} disabled={busyAction !== null}>
+                  {busyAction === "updatePolicy" ? "Processing..." : "Update policy"}
                 </button>
 
                 <div className="divider" />
@@ -308,8 +310,8 @@ function Dashboard() {
                     <input id="inv-risk" value={investorRisk} onChange={(e) => setInvestorRisk(e.target.value)} />
                   </div>
                 </div>
-                <button type="button" className="btn btn-primary" onClick={registerInvestor} disabled={isBusy}>
-                  {isBusy ? "Processing..." : "Register investor"}
+                <button type="button" className="btn btn-primary" onClick={registerInvestor} disabled={busyAction !== null}>
+                  {busyAction === "registerInvestor" ? "Processing..." : "Register investor"}
                 </button>
                   </article>
 
@@ -317,8 +319,8 @@ function Dashboard() {
                 <h2>Investor metadata</h2>
                 <label htmlFor="lookup-addr">Address</label>
                 <input id="lookup-addr" value={lookupAddress} onChange={(e) => setLookupAddress(e.target.value)} />
-                <button type="button" className="btn btn-secondary" onClick={fetchMetadata} disabled={isBusy}>
-                  {isBusy ? "Processing..." : "Fetch metadata"}
+                <button type="button" className="btn btn-secondary" onClick={fetchMetadata} disabled={busyAction !== null}>
+                  {busyAction === "fetchMetadata" ? "Processing..." : "Fetch metadata"}
                 </button>
                 {metadata && (
                   <dl className="metadata-dl">
